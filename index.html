@@ -14,127 +14,151 @@
         </header>
 
         <main>
-            <!-- Indicador de etapas -->
-            <div class="stepper" id="stepper">
-                <div class="step-indicator" data-step="1">
-                    <div class="step-bubble">1</div>
-                    <span class="step-label">Identificação</span>
-                </div>
-                <div class="step-connector"></div>
-                <div class="step-indicator" data-step="2">
-                    <div class="step-bubble">2</div>
-                    <span class="step-label">Classe</span>
-                </div>
-                <div class="step-connector"></div>
-                <div class="step-indicator" data-step="3">
-                    <div class="step-bubble">3</div>
-                    <span class="step-label">Inventário</span>
-                </div>
-                <div class="step-connector"></div>
-                <div class="step-indicator" data-step="4">
-                    <div class="step-bubble">4</div>
-                    <span class="step-label">Atributos</span>
-                </div>
+
+            <!-- ══════════════════════════════
+                 TELA 1: Início
+            ══════════════════════════════ -->
+            <div id="screen-home">
+
+                <figure class="village-art">
+                    <img src="village.svg" alt="Vila encantada ao entardecer">
+                </figure>
+
+                <section class="home-chars">
+                    <div class="home-chars-header">
+                        <h2 class="home-chars-title">Personagens</h2>
+                        <span class="home-chars-count" id="char-count"></span>
+                    </div>
+
+                    <div id="char-list">
+                        <!-- Populado pelo app.js -->
+                    </div>
+
+                    <div class="home-actions">
+                        <button class="btn-create" id="btn-create">+ Novo Personagem</button>
+                    </div>
+                </section>
+
             </div>
 
-            <!-- Etapa 1: Identificação -->
-            <section class="step-panel" id="step-1">
-                <h2 class="section-title"><span class="section-number">1</span> Identificação</h2>
+            <!-- ══════════════════════════════
+                 TELA 2: Wizard de criação
+            ══════════════════════════════ -->
+            <div id="screen-wizard" class="hidden">
 
-                <div class="field-group">
-                    <label for="char-name">Nome do Personagem <span class="required">*</span></label>
-                    <input type="text" id="char-name" name="char-name"
-                           placeholder="Como seu personagem é chamado?">
-                    <span class="field-error" id="error-name"></span>
+                <!-- Indicador de etapas -->
+                <div class="stepper" id="stepper">
+                    <div class="step-indicator" data-step="1">
+                        <div class="step-bubble">1</div>
+                        <span class="step-label">Identificação</span>
+                    </div>
+                    <div class="step-connector"></div>
+                    <div class="step-indicator" data-step="2">
+                        <div class="step-bubble">2</div>
+                        <span class="step-label">Classe</span>
+                    </div>
+                    <div class="step-connector"></div>
+                    <div class="step-indicator" data-step="3">
+                        <div class="step-bubble">3</div>
+                        <span class="step-label">Inventário</span>
+                    </div>
+                    <div class="step-connector"></div>
+                    <div class="step-indicator" data-step="4">
+                        <div class="step-bubble">4</div>
+                        <span class="step-label">Atributos</span>
+                    </div>
                 </div>
 
-                <div class="field-group">
-                    <label for="char-history">História</label>
-                    <textarea id="char-history" name="char-history"
-                              placeholder="Conte a história do seu personagem..." rows="4"></textarea>
+                <!-- Etapa 1: Identificação -->
+                <section class="step-panel" id="step-1">
+                    <h2 class="section-title"><span class="section-number">1</span> Identificação</h2>
+                    <div class="field-group">
+                        <label for="char-name">Nome do Personagem <span class="required">*</span></label>
+                        <input type="text" id="char-name" name="char-name"
+                               placeholder="Como seu personagem é chamado?">
+                        <span class="field-error" id="error-name"></span>
+                    </div>
+                    <div class="field-group">
+                        <label for="char-history">História</label>
+                        <textarea id="char-history" name="char-history"
+                                  placeholder="Conte a história do seu personagem..." rows="4"></textarea>
+                    </div>
+                    <div class="field-group">
+                        <label for="char-appearance">Aparência</label>
+                        <textarea id="char-appearance" name="char-appearance"
+                                  placeholder="Descreva a aparência do seu personagem..." rows="3"></textarea>
+                    </div>
+                </section>
+
+                <!-- Etapa 2: Classe -->
+                <section class="step-panel hidden" id="step-2">
+                    <h2 class="section-title"><span class="section-number">2</span> Classe</h2>
+                    <p class="section-hint">Escolha uma das 7 classes disponíveis.</p>
+                    <div class="class-grid" id="class-grid"></div>
+                    <span class="field-error" id="error-class"></span>
+                    <div class="field-group magic-section hidden" id="magic-section">
+                        <label for="char-magic">Poderes e Magias <span class="required">*</span></label>
+                        <textarea id="char-magic" name="char-magic"
+                                  placeholder="Descreva os poderes e magias do seu personagem..." rows="4"></textarea>
+                        <span class="field-error" id="error-magic"></span>
+                    </div>
+                </section>
+
+                <!-- Etapa 3: Inventário -->
+                <section class="step-panel hidden" id="step-3">
+                    <h2 class="section-title"><span class="section-number">3</span> Inventário</h2>
+                    <p class="section-hint">Escolha exatamente <strong>3 itens</strong> da lista da sua classe.</p>
+                    <div class="inventory-counter">
+                        Itens selecionados: <span id="item-count">0</span> / 3
+                    </div>
+                    <div class="inventory-grid" id="inventory-grid">
+                        <p class="placeholder-text">Selecione uma classe para ver os itens disponíveis.</p>
+                    </div>
+                    <span class="field-error" id="error-inventory"></span>
+                </section>
+
+                <!-- Etapa 4: Atributos -->
+                <section class="step-panel hidden" id="step-4">
+                    <h2 class="section-title"><span class="section-number">4</span> Atributos</h2>
+                    <p class="section-hint">
+                        Distribua exatamente <strong>10 pedras</strong> entre os atributos.
+                        Máximo de <strong>3 pedras</strong> por atributo.
+                    </p>
+                    <div class="stones-display">
+                        Pedras Restantes: <span id="stones-left" class="stones-value">10</span>
+                    </div>
+                    <div class="stats-grid" id="stats-grid"></div>
+                    <span class="field-error" id="error-stats"></span>
+                </section>
+
+                <!-- Navegação -->
+                <div class="step-nav" id="step-nav">
+                    <button class="btn-back hidden" id="btn-back">← Voltar</button>
+                    <button class="btn-wizard-home" id="btn-wizard-home">Início</button>
+                    <button class="btn-next" id="btn-next">Avançar →</button>
                 </div>
 
-                <div class="field-group">
-                    <label for="char-appearance">Aparência</label>
-                    <textarea id="char-appearance" name="char-appearance"
-                              placeholder="Descreva a aparência do seu personagem..." rows="3"></textarea>
-                </div>
-            </section>
-
-            <!-- Etapa 2: Classe -->
-            <section class="step-panel hidden" id="step-2">
-                <h2 class="section-title"><span class="section-number">2</span> Classe</h2>
-                <p class="section-hint">Escolha uma das 7 classes disponíveis.</p>
-
-                <div class="class-grid" id="class-grid">
-                    <!-- Populado pelo app.js -->
-                </div>
-                <span class="field-error" id="error-class"></span>
-
-                <div class="field-group magic-section hidden" id="magic-section">
-                    <label for="char-magic">Poderes e Magias <span class="required">*</span></label>
-                    <textarea id="char-magic" name="char-magic"
-                              placeholder="Descreva os poderes e magias do seu personagem..." rows="4"></textarea>
-                    <span class="field-error" id="error-magic"></span>
-                </div>
-            </section>
-
-            <!-- Etapa 3: Inventário -->
-            <section class="step-panel hidden" id="step-3">
-                <h2 class="section-title"><span class="section-number">3</span> Inventário</h2>
-                <p class="section-hint">
-                    Escolha exatamente <strong>3 itens</strong> da lista da sua classe.
-                </p>
-
-                <div class="inventory-counter">
-                    Itens selecionados: <span id="item-count">0</span> / 3
-                </div>
-                <div class="inventory-grid" id="inventory-grid">
-                    <p class="placeholder-text">Selecione uma classe para ver os itens disponíveis.</p>
-                </div>
-                <span class="field-error" id="error-inventory"></span>
-            </section>
-
-            <!-- Etapa 4: Atributos -->
-            <section class="step-panel hidden" id="step-4">
-                <h2 class="section-title"><span class="section-number">4</span> Atributos</h2>
-                <p class="section-hint">
-                    Distribua exatamente <strong>10 pedras</strong> entre os atributos.
-                    Máximo de <strong>3 pedras</strong> por atributo.
-                </p>
-
-                <div class="stones-display">
-                    Pedras Restantes: <span id="stones-left" class="stones-value">10</span>
-                </div>
-                <div class="stats-grid" id="stats-grid">
-                    <!-- Populado pelo app.js -->
-                </div>
-                <span class="field-error" id="error-stats"></span>
-            </section>
-
-            <!-- Navegação entre etapas -->
-            <div class="step-nav" id="step-nav">
-                <button class="btn-back hidden" id="btn-back">← Voltar</button>
-                <button class="btn-next" id="btn-next">Avançar →</button>
             </div>
 
-            <!-- Ficha finalizada -->
-            <section class="character-sheet hidden" id="character-sheet">
+            <!-- ══════════════════════════════
+                 TELA 3: Ficha do personagem
+            ══════════════════════════════ -->
+            <div id="screen-view" class="hidden">
                 <div class="sheet-inner">
                     <div class="sheet-header">
                         <h2>Ficha de Personagem</h2>
                         <p class="sheet-tagline">Contos do Vilarejo</p>
                     </div>
-                    <div class="sheet-content" id="sheet-content">
-                        <!-- Renderizado pelo app.js -->
-                    </div>
+                    <div class="sheet-content" id="sheet-content"></div>
                     <div class="sheet-actions">
                         <button class="btn-secondary" id="btn-copy">Copiar Ficha</button>
                         <button class="btn-secondary" id="btn-print">Imprimir</button>
-                        <button class="btn-new" id="btn-new">Novo Personagem</button>
+                        <button class="btn-danger"    id="btn-delete">Excluir</button>
+                        <button class="btn-new"       id="btn-home">← Início</button>
                     </div>
                 </div>
-            </section>
+            </div>
+
         </main>
 
         <footer class="site-footer">

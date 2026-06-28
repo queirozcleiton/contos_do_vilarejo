@@ -25,15 +25,14 @@ const ITENS_POR_CLASSE = {
 };
 
 const CLASSES_COM_MAGIA = new Set(['fada', 'bruxa', 'sereia']);
+const ATRIBUTOS          = ['Velocidade', 'Força', 'Equilíbrio', 'Furtividade', 'Conhecimento', 'Stamina'];
+const TOTAL_PEDRAS       = 10;
+const MAX_POR_ATTR       = 3;
+const TOTAL_ITENS        = 3;
+const TOTAL_STEPS        = 4;
+const STORAGE_KEY        = 'contos_personagens';
 
-const ATRIBUTOS = ['Velocidade', 'Força', 'Equilíbrio', 'Furtividade', 'Conhecimento', 'Stamina'];
-
-const TOTAL_PEDRAS = 10;
-const MAX_POR_ATTR = 3;
-const TOTAL_ITENS  = 3;
-const TOTAL_STEPS  = 4;
-
-// ---- Estado da Aplicação ----
+// ---- Estado do Wizard ----
 
 const state = {
     currentStep:       1,
@@ -42,49 +41,173 @@ const state = {
     stats:             Object.fromEntries(ATRIBUTOS.map(a => [a, 0])),
 };
 
+let currentViewId = null;
+
 function pedrasRestantes() {
     return TOTAL_PEDRAS - Object.values(state.stats).reduce((s, v) => s + v, 0);
 }
 
-// ---- Inicialização ----
+// ============================================================
+// PERSISTÊNCIA (localStorage)
+// ============================================================
 
-document.addEventListener('DOMContentLoaded', () => {
-    renderClasses();
-    renderStats();
+function getCharacters() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+    catch { return []; }
+}
+
+function persistCharacter(char) {
+    const list = getCharacters();
+    list.push(char);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+}
+
+function removeCharacter(id) {
+    const list = getCharacters().filter(c => c.id !== id);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+}
+
+// ============================================================
+// GERENCIAMENTO DE TELAS
+// ============================================================
+
+function showScreen(name) {
+    ['home', 'wizard', 'view'].forEach(s => {
+        document.getElementById(`screen-${s}`).classList.toggle('hidden', s !== name);
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ============================================================
+// TELA: HOME
+// ============================================================
+
+function renderHome() {
+    showScreen('home');
+    const chars = getCharacters();
+    const list  = document.getElementById('char-list');
+    const count = document.getElementById('char-count');
+
+    if (chars.length === 0) {
+        count.textContent = 'Nenhum personagem';
+        list.innerHTML = `<p class="empty-state">Nenhum personagem criado ainda.<br>Que tal começar sua aventura?</p>`;
+        return;
+    }
+
+    count.textContent = chars.length === 1 ? '1 personagem' : `${chars.length} personagens`;
+    list.innerHTML = '';
+
+    // Mais recente primeiro
+    [...chars].reverse().forEach(char => {
+        const cls  = CLASSES.find(c => c.id === char.classId);
+        const date = new Date(char.createdAt).toLocaleDateString('pt-BR', {
+            day: 'numeric', month: 'short', year: 'numeric'
+        });
+
+        const card = document.createElement('div');
+        card.className = 'char-card';
+        card.innerHTML = `
+            <div class="char-card-info" data-id="${char.id}">
+                <span class="char-card-icon">${cls?.icone ?? '?'}</span>
+                <div class="char-card-text">
+                    <strong class="char-card-name">${escapeHtml(char.name)}</strong>
+                    <span class="char-card-meta">${cls?.nome ?? ''} &middot; ${date}</span>
+                </div>
+            </div>
+            <span class="char-card-arrow">›</span>
+            <button class="char-card-delete" data-id="${char.id}" title="Excluir personagem">✕</button>
+        `;
+
+        card.querySelector('.char-card-info').addEventListener('click',
+            () => viewCharacter(char.id));
+
+        card.querySelector('.char-card-delete').addEventListener('click', e => {
+            e.stopPropagation();
+            confirmarExclusao(char.id, char.name);
+        });
+
+        list.appendChild(card);
+    });
+}
+
+function confirmarExclusao(id, name) {
+    if (confirm(`Excluir "${name}"? Esta ação não pode ser desfeita.`)) {
+        removeCharacter(id);
+        if (currentViewId === id) {
+            renderHome();
+        } else {
+            renderHome();
+        }
+    }
+}
+
+// ============================================================
+// TELA: FICHA SALVA (VIEW)
+// ============================================================
+
+function viewCharacter(id) {
+    const char = getCharacters().find(c => c.id === id);
+    if (!char) return;
+    currentViewId = id;
+    renderSheetFromData(char);
+    showScreen('view');
+}
+
+function renderSheetFromData(char) {
+    const cls     = CLASSES.find(c => c.id === char.classId);
+    const content = document.getElementById('sheet-content');
+    content.innerHTML = '';
+
+    content.appendChild(criarBloco('Personagem', `
+        <p><strong>Nome:</strong> ${escapeHtml(char.name)}</p>
+        <p><strong>Classe:</strong> ${cls?.icone ?? ''} ${cls?.nome ?? char.classId}</p>
+    `));
+
+    if (char.history)    content.appendChild(criarBloco('História',         `<p>${escapeHtml(char.history)}</p>`));
+    if (char.appearance) content.appendChild(criarBloco('Aparência',        `<p>${escapeHtml(char.appearance)}</p>`));
+    if (char.magic)      content.appendChild(criarBloco('Poderes e Magias', `<p>${escapeHtml(char.magic)}</p>`));
+
+    const itensHtml = (char.items || [])
+        .map(item => `<span class="sheet-item-tag">${escapeHtml(item)}</span>`)
+        .join('');
+    content.appendChild(criarBloco('Inventário', `<div class="sheet-items">${itensHtml}</div>`));
+
+    const statsHtml = ATRIBUTOS.map(attr => `
+        <div class="sheet-stat">
+            <span class="sheet-stat-name">${attr}</span>
+            <span class="sheet-stat-val">${char.stats?.[attr] ?? 0}</span>
+        </div>`).join('');
+    content.appendChild(criarBloco('Atributos', `<div class="sheet-stats-list">${statsHtml}</div>`));
+}
+
+// ============================================================
+// WIZARD DE CRIAÇÃO
+// ============================================================
+
+function abrirWizard() {
+    resetarWizard();
+    showScreen('wizard');
     showStep(1);
-
-    document.getElementById('btn-next').addEventListener('click', avancar);
-    document.getElementById('btn-back').addEventListener('click', voltar);
-    document.getElementById('btn-copy').addEventListener('click', copiarFicha);
-    document.getElementById('btn-print').addEventListener('click', () => window.print());
-    document.getElementById('btn-new').addEventListener('click', resetarFormulario);
-});
-
-// ---- Navegação entre Etapas ----
+}
 
 function showStep(step) {
-    // Painéis
     for (let i = 1; i <= TOTAL_STEPS; i++) {
         document.getElementById(`step-${i}`).classList.toggle('hidden', i !== step);
     }
 
-    // Indicadores do stepper
     document.querySelectorAll('.step-indicator').forEach(el => {
         const n = parseInt(el.dataset.step);
         el.classList.remove('active', 'completed');
-        if (n === step)   el.classList.add('active');
-        if (n < step)     el.classList.add('completed');
+        if (n === step) el.classList.add('active');
+        if (n < step)   el.classList.add('completed');
     });
 
-    // Conectores
     document.querySelectorAll('.step-connector').forEach((el, i) => {
         el.classList.toggle('completed', i + 1 < step);
     });
 
-    // Botão Voltar
     document.getElementById('btn-back').classList.toggle('hidden', step === 1);
 
-    // Botão Avançar / Gerar Ficha
     const btnNext = document.getElementById('btn-next');
     if (step === TOTAL_STEPS) {
         btnNext.textContent = 'Gerar Ficha ✦';
@@ -95,13 +218,12 @@ function showStep(step) {
     }
 
     state.currentStep = step;
-    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function avancar() {
     if (!validarEtapa(state.currentStep)) return;
     if (state.currentStep === TOTAL_STEPS) {
-        exibirFicha();
+        salvarEExibir();
     } else {
         showStep(state.currentStep + 1);
     }
@@ -114,14 +236,14 @@ function voltar() {
 // ---- Validação por Etapa ----
 
 function validarEtapa(step) {
-    let valido = true;
+    let ok = true;
 
     if (step === 1) {
         const nome = document.getElementById('char-name').value.trim();
         if (!nome) {
             mostrarErro('error-name', 'O nome do personagem é obrigatório.');
             document.getElementById('char-name').classList.add('is-invalid');
-            valido = false;
+            ok = false;
         } else {
             limparErro('error-name');
             document.getElementById('char-name').classList.remove('is-invalid');
@@ -131,7 +253,7 @@ function validarEtapa(step) {
     if (step === 2) {
         if (!state.classeSelecionada) {
             mostrarErro('error-class', 'Selecione uma classe para o personagem.');
-            valido = false;
+            ok = false;
         } else {
             limparErro('error-class');
         }
@@ -141,7 +263,7 @@ function validarEtapa(step) {
             if (!magia) {
                 mostrarErro('error-magic', 'Descreva os poderes e magias do personagem.');
                 document.getElementById('char-magic').classList.add('is-invalid');
-                valido = false;
+                ok = false;
             } else {
                 limparErro('error-magic');
                 document.getElementById('char-magic').classList.remove('is-invalid');
@@ -154,7 +276,7 @@ function validarEtapa(step) {
         const esperado    = Math.min(TOTAL_ITENS, itensClasse.length);
         if (state.itensSelecionados.size !== esperado) {
             mostrarErro('error-inventory', `Selecione exatamente ${esperado} item(ns) do inventário.`);
-            valido = false;
+            ok = false;
         } else {
             limparErro('error-inventory');
         }
@@ -165,16 +287,37 @@ function validarEtapa(step) {
         if (total !== TOTAL_PEDRAS) {
             mostrarErro('error-stats',
                 `Distribua exatamente 10 pedras. Faltam ${TOTAL_PEDRAS - total} pedra(s).`);
-            valido = false;
+            ok = false;
         } else {
             limparErro('error-stats');
         }
     }
 
-    return valido;
+    return ok;
 }
 
-// ---- Renderização das Classes ----
+// ---- Salvar e Exibir Ficha ----
+
+function salvarEExibir() {
+    const char = {
+        id:         Date.now().toString(),
+        createdAt:  new Date().toISOString(),
+        name:       document.getElementById('char-name').value.trim(),
+        classId:    state.classeSelecionada,
+        history:    document.getElementById('char-history').value.trim(),
+        appearance: document.getElementById('char-appearance').value.trim(),
+        magic:      document.getElementById('char-magic').value.trim(),
+        items:      [...state.itensSelecionados],
+        stats:      { ...state.stats },
+    };
+
+    persistCharacter(char);
+    currentViewId = char.id;
+    renderSheetFromData(char);
+    showScreen('view');
+}
+
+// ---- Classes ----
 
 function renderClasses() {
     const grid = document.getElementById('class-grid');
@@ -199,19 +342,18 @@ function selecionarClasse(classeId) {
     });
 
     const magicSection = document.getElementById('magic-section');
-    const magicTextarea = document.getElementById('char-magic');
     if (CLASSES_COM_MAGIA.has(classeId)) {
         magicSection.classList.remove('hidden');
     } else {
         magicSection.classList.add('hidden');
-        magicTextarea.value = '';
+        document.getElementById('char-magic').value = '';
     }
 
     limparErro('error-class');
     renderInventario(classeId);
 }
 
-// ---- Renderização do Inventário ----
+// ---- Inventário ----
 
 function renderInventario(classeId) {
     const grid    = document.getElementById('inventory-grid');
@@ -219,15 +361,11 @@ function renderInventario(classeId) {
     const autoSel = itens.length <= TOTAL_ITENS;
 
     grid.innerHTML = '';
-
-    if (autoSel) {
-        itens.forEach(item => state.itensSelecionados.add(item));
-    }
+    if (autoSel) itens.forEach(item => state.itensSelecionados.add(item));
 
     itens.forEach(item => {
         const card = document.createElement('div');
-        card.className = 'item-card';
-        if (autoSel) card.classList.add('auto-selected');
+        card.className = 'item-card' + (autoSel ? ' auto-selected' : '');
         card.dataset.item = item;
         card.innerHTML = `<span class="item-checkbox">${autoSel ? '✓' : ''}</span>
                           <span>${item}</span>`;
@@ -251,8 +389,8 @@ function toggleItem(item) {
     document.querySelectorAll('.item-card').forEach(card => {
         const estaSel   = state.itensSelecionados.has(card.dataset.item);
         const bloqueado = !estaSel && limite;
-        card.classList.toggle('selected',  estaSel);
-        card.classList.toggle('disabled',  bloqueado);
+        card.classList.toggle('selected', estaSel);
+        card.classList.toggle('disabled', bloqueado);
         card.querySelector('.item-checkbox').textContent = estaSel ? '✓' : '';
     });
 
@@ -264,7 +402,7 @@ function atualizarContadorItens() {
     document.getElementById('item-count').textContent = state.itensSelecionados.size;
 }
 
-// ---- Renderização dos Atributos ----
+// ---- Atributos ----
 
 function renderStats() {
     const grid = document.getElementById('stats-grid');
@@ -293,7 +431,6 @@ function ajustarStat(attr, delta) {
     const novo = state.stats[attr] + delta;
     if (novo < 0 || novo > MAX_POR_ATTR) return;
     if (delta > 0 && pedrasRestantes() <= 0) return;
-
     state.stats[attr] = novo;
     atualizarStats();
     limparErro('error-stats');
@@ -308,7 +445,6 @@ function atualizarStats() {
 
     ATRIBUTOS.forEach(attr => {
         const val = state.stats[attr];
-
         document.getElementById(`val-${attr}`).textContent = val;
 
         const dotsEl = document.getElementById(`dots-${attr}`);
@@ -324,93 +460,37 @@ function atualizarStats() {
     });
 }
 
-// ---- Renderização da Ficha ----
-
-function exibirFicha() {
-    const nome      = document.getElementById('char-name').value.trim();
-    const historia  = document.getElementById('char-history').value.trim();
-    const aparencia = document.getElementById('char-appearance').value.trim();
-    const magia     = document.getElementById('char-magic').value.trim();
-    const classeObj = CLASSES.find(c => c.id === state.classeSelecionada);
-
-    const content = document.getElementById('sheet-content');
-    content.innerHTML = '';
-
-    content.appendChild(criarBloco('Personagem', `
-        <p><strong>Nome:</strong> ${escapeHtml(nome)}</p>
-        <p><strong>Classe:</strong> ${classeObj.icone} ${classeObj.nome}</p>
-    `));
-
-    if (historia)  content.appendChild(criarBloco('História',  `<p>${escapeHtml(historia)}</p>`));
-    if (aparencia) content.appendChild(criarBloco('Aparência', `<p>${escapeHtml(aparencia)}</p>`));
-    if (magia)     content.appendChild(criarBloco('Poderes e Magias', `<p>${escapeHtml(magia)}</p>`));
-
-    const itensHtml = [...state.itensSelecionados]
-        .map(item => `<span class="sheet-item-tag">${escapeHtml(item)}</span>`)
-        .join('');
-    content.appendChild(criarBloco('Inventário', `<div class="sheet-items">${itensHtml}</div>`));
-
-    const statsHtml = ATRIBUTOS
-        .map(attr => `
-            <div class="sheet-stat">
-                <span class="sheet-stat-name">${attr}</span>
-                <span class="sheet-stat-val">${state.stats[attr]}</span>
-            </div>`)
-        .join('');
-    content.appendChild(criarBloco('Atributos', `<div class="sheet-stats-list">${statsHtml}</div>`));
-
-    // Oculta o wizard, exibe a ficha
-    for (let i = 1; i <= TOTAL_STEPS; i++) {
-        document.getElementById(`step-${i}`).classList.add('hidden');
-    }
-    document.getElementById('stepper').classList.add('hidden');
-    document.getElementById('step-nav').classList.add('hidden');
-    document.getElementById('character-sheet').classList.remove('hidden');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function criarBloco(titulo, innerHtml) {
-    const div = document.createElement('div');
-    div.className = 'sheet-block';
-    div.innerHTML = `<h3>${titulo}</h3>${innerHtml}`;
-    return div;
-}
-
 // ---- Copiar Ficha ----
 
 function copiarFicha() {
-    const nome      = document.getElementById('char-name').value.trim();
-    const historia  = document.getElementById('char-history').value.trim();
-    const aparencia = document.getElementById('char-appearance').value.trim();
-    const magia     = document.getElementById('char-magic').value.trim();
-    const classeObj = CLASSES.find(c => c.id === state.classeSelecionada);
+    const char = getCharacters().find(c => c.id === currentViewId);
+    if (!char) return;
 
+    const cls = CLASSES.find(c => c.id === char.classId);
     let texto  = `=== FICHA DE PERSONAGEM — CONTOS DO VILAREJO ===\n\n`;
-    texto += `Nome: ${nome}\n`;
-    texto += `Classe: ${classeObj.nome}\n`;
+    texto += `Nome: ${char.name}\nClasse: ${cls?.nome ?? char.classId}\n`;
 
-    if (historia)  texto += `\nHistória:\n${historia}\n`;
-    if (aparencia) texto += `\nAparência:\n${aparencia}\n`;
-    if (magia)     texto += `\nPoderes e Magias:\n${magia}\n`;
+    if (char.history)    texto += `\nHistória:\n${char.history}\n`;
+    if (char.appearance) texto += `\nAparência:\n${char.appearance}\n`;
+    if (char.magic)      texto += `\nPoderes e Magias:\n${char.magic}\n`;
 
-    texto += `\nInventário:\n${[...state.itensSelecionados].map(i => `  • ${i}`).join('\n')}\n`;
-
+    texto += `\nInventário:\n${(char.items || []).map(i => `  • ${i}`).join('\n')}\n`;
     texto += `\nAtributos:\n`;
-    ATRIBUTOS.forEach(attr => { texto += `  ${attr}: ${state.stats[attr]}\n`; });
+    ATRIBUTOS.forEach(a => { texto += `  ${a}: ${char.stats?.[a] ?? 0}\n`; });
 
     navigator.clipboard.writeText(texto).then(() => {
         const btn = document.getElementById('btn-copy');
-        const original = btn.textContent;
+        const orig = btn.textContent;
         btn.textContent = 'Copiado!';
-        setTimeout(() => { btn.textContent = original; }, 2000);
+        setTimeout(() => { btn.textContent = orig; }, 2000);
     }).catch(() => {
         alert('Não foi possível copiar automaticamente. Selecione o texto manualmente.');
     });
 }
 
-// ---- Reset ----
+// ---- Reset do Wizard ----
 
-function resetarFormulario() {
+function resetarWizard() {
     state.currentStep       = 1;
     state.classeSelecionada = null;
     state.itensSelecionados.clear();
@@ -432,14 +512,18 @@ function resetarFormulario() {
     document.getElementById('inventory-grid').innerHTML =
         '<p class="placeholder-text">Selecione uma classe para ver os itens disponíveis.</p>';
     document.getElementById('item-count').textContent = '0';
-
-    document.getElementById('character-sheet').classList.add('hidden');
-    document.getElementById('stepper').classList.remove('hidden');
-    document.getElementById('step-nav').classList.remove('hidden');
-    showStep(1);
 }
 
-// ---- Utilitários ----
+// ============================================================
+// UTILITÁRIOS
+// ============================================================
+
+function criarBloco(titulo, innerHtml) {
+    const div = document.createElement('div');
+    div.className = 'sheet-block';
+    div.innerHTML = `<h3>${titulo}</h3>${innerHtml}`;
+    return div;
+}
 
 function mostrarErro(id, msg) {
     const el = document.getElementById(id);
@@ -452,8 +536,35 @@ function limparErro(id) {
 }
 
 function escapeHtml(str) {
+    if (!str) return '';
     return str
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
 }
+
+// ============================================================
+// INICIALIZAÇÃO
+// ============================================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Wizard controls
+    document.getElementById('btn-next').addEventListener('click', avancar);
+    document.getElementById('btn-back').addEventListener('click', voltar);
+    document.getElementById('btn-wizard-home').addEventListener('click', renderHome);
+
+    // View controls
+    document.getElementById('btn-copy').addEventListener('click', copiarFicha);
+    document.getElementById('btn-print').addEventListener('click', () => window.print());
+    document.getElementById('btn-home').addEventListener('click', renderHome);
+    document.getElementById('btn-delete').addEventListener('click', () => {
+        const char = getCharacters().find(c => c.id === currentViewId);
+        if (char) confirmarExclusao(char.id, char.name);
+    });
+
+    // Home controls
+    document.getElementById('btn-create').addEventListener('click', abrirWizard);
+
+    // Start on home screen
+    renderHome();
+});
